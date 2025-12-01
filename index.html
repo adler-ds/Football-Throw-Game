@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Throwing Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="powerMeter">
+            <div id="powerBar"></div>
+        </div>
+
+        <div id="ui">
+            <div>Hits: <span id="hitsCount">0</span></div>
+            <div>Throws: <span id="throwsCount">0</span></div>
+        </div>
+
+        <div id="timer">
+            Time: <span id="timeLeft">10</span>s
+        </div>
+
+        <button id="throwButton">THROW!</button>
+
+        <div id="instructions">
+            Watch the power meter and time your throw!<br>
+            Hit the receiver to score points!
+        </div>
+
+        <div id="gameOverScreen">
+            <h2>🏆 TIME'S UP! 🏆</h2>
+            <div id="finalStats"></div>
+            <div class="prize-text" id="prizeDisplay">You won a Free Appetizer!</div>
+            <button id="playAgainBtn">Play Again</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
