@@ -522,10 +522,13 @@ app.post('/api/salesforce/create-member', async (req, res) => {
         });
         res.on('end', () => {
           console.log(`Flow API response status: ${res.statusCode}`);
+          console.log(`Flow API response body: ${data.substring(0, 500)}`);
           if (res.statusCode >= 200 && res.statusCode < 300) {
             try {
-              resolve(JSON.parse(data));
+              const parsed = JSON.parse(data);
+              resolve(parsed);
             } catch (e) {
+              console.error('Failed to parse Flow API response:', data);
               reject(new Error(`Failed to parse Flow API response: ${e.message}`));
             }
           } else {
@@ -548,9 +551,11 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     // Check if the response is an array (as per example)
     if (Array.isArray(result) && result.length > 0) {
       const flowResult = result[0];
+      console.log('Flow result:', JSON.stringify(flowResult, null, 2));
       
       if (flowResult.isSuccess && flowResult.outputValues && flowResult.outputValues.MemberID) {
         const memberId = flowResult.outputValues.MemberID;
+        console.log(`✅ Member created successfully with MemberID: ${memberId}`);
         
         return res.json({
           success: true,
@@ -560,14 +565,16 @@ app.post('/api/salesforce/create-member', async (req, res) => {
       } else {
         // Flow completed but may have errors
         const errors = flowResult.errors || ['Unknown error occurred'];
+        console.error('Flow execution failed:', errors);
         return res.status(400).json({
           success: false,
-          error: Array.isArray(errors) ? errors.join(', ') : errors,
+          error: Array.isArray(errors) ? errors.map(e => e.message || e).join(', ') : errors,
           flowResult: flowResult
         });
       }
     } else {
       // Unexpected response format
+      console.error('Unexpected response format:', result);
       return res.status(500).json({
         success: false,
         error: 'Unexpected response format from Salesforce Flow',
