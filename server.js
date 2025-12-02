@@ -94,14 +94,27 @@ async function authenticateSalesforce() {
       client_secret: SALESFORCE_CONFIG.clientSecret
     }).toString();
 
+    // Validate tokenUrl is correct
+    if (!tokenUrl.startsWith('https://')) {
+      throw new Error(`Invalid token URL: ${tokenUrl}. Must use HTTPS.`);
+    }
+    
+    console.log(`Making token request to: ${tokenUrl}`);
+    
     // Make token request using native Node.js https/http
     const parsedUrl = new URL(tokenUrl);
-    const requestModule = parsedUrl.protocol === 'https:' ? https : http;
+    
+    // Ensure we're using HTTPS
+    if (parsedUrl.protocol !== 'https:') {
+      throw new Error(`Token URL must use HTTPS, got: ${parsedUrl.protocol}`);
+    }
+    
+    const requestModule = https; // Always use HTTPS for Salesforce
     
     const tokenResponse = await new Promise((resolve, reject) => {
       const options = {
         hostname: parsedUrl.hostname,
-        port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+        port: parsedUrl.port || 443,
         path: parsedUrl.pathname,
         method: 'POST',
         headers: {
@@ -109,6 +122,13 @@ async function authenticateSalesforce() {
           'Content-Length': Buffer.byteLength(tokenRequestData)
         }
       };
+      
+      console.log(`Request options:`, {
+        hostname: options.hostname,
+        port: options.port,
+        path: options.path,
+        method: options.method
+      });
 
       const req = requestModule.request(options, (res) => {
         let data = '';
@@ -116,14 +136,20 @@ async function authenticateSalesforce() {
           data += chunk;
         });
         res.on('end', () => {
+          console.log(`Token response status: ${res.statusCode}`);
           if (res.statusCode >= 200 && res.statusCode < 300) {
             try {
-              resolve(JSON.parse(data));
+              const parsed = JSON.parse(data);
+              console.log('Token request successful');
+              resolve(parsed);
             } catch (e) {
+              console.error('Failed to parse token response:', data);
               reject(new Error(`Failed to parse token response: ${e.message}`));
             }
           } else {
-            reject(new Error(`Token request failed: ${res.statusCode} - ${data}`));
+            console.error(`Token request failed with status ${res.statusCode}`);
+            console.error('Response data:', data.substring(0, 500)); // Log first 500 chars
+            reject(new Error(`Token request failed: ${res.statusCode} - ${data.substring(0, 200)}`));
           }
         });
       });
