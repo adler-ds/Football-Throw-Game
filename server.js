@@ -168,9 +168,16 @@ async function authenticateSalesforce() {
       instanceUrl: instanceUrl
     });
     
+    // Ensure the connection object has the accessToken property set
+    // (jsforce should set this automatically, but we'll verify)
+    if (!conn.accessToken) {
+      conn.accessToken = accessToken;
+    }
+    
     console.log('✅ Successfully authenticated with Salesforce');
     console.log(`Instance URL: ${instanceUrl}`);
     console.log(`Token expires in: ${expiresIn} seconds`);
+    console.log(`Access Token: ${accessToken.substring(0, 20)}...`);
     
     return conn;
   } catch (error) {
@@ -461,8 +468,18 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     // Make REST API call to Salesforce Flow using jsforce request method
     // Ensure we have a valid access token
     if (!connection.accessToken) {
-      throw new Error('No access token available. Please re-authenticate.');
+      console.error('Connection accessToken is missing, re-authenticating...');
+      await authenticateSalesforce();
+      // Get the refreshed connection
+      const refreshedConnection = await ensureAuthenticated();
+      if (!refreshedConnection.accessToken) {
+        throw new Error('Failed to obtain access token after re-authentication');
+      }
+      connection = refreshedConnection;
     }
+    
+    console.log(`Using access token: ${connection.accessToken.substring(0, 20)}...`);
+    console.log(`Instance URL: ${connection.instanceUrl}`);
     
     // Make the request with proper headers
     // jsforce should add Authorization header automatically, but we'll ensure it's set
