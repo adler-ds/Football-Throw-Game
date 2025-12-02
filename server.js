@@ -1,5 +1,4 @@
 const express = require('express');
-const jsforce = require('jsforce');
 const path = require('path');
 require('dotenv').config();
 
@@ -11,109 +10,63 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 app.use(require('cors')());
 
-// Salesforce Configuration
+// Salesforce Configuration - Using Auth Provider details
 const SALESFORCE_CONFIG = {
-  loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce.com',
-  clientId: process.env.SALESFORCE_CLIENT_ID,
-  clientSecret: process.env.SALESFORCE_CLIENT_SECRET
+  // Auth Provider Token Endpoint (from Auth Provider configuration)
+  tokenEndpoint: 'https://login.salesforce.com/services/oauth2/token',
+  // Consumer Key and Secret from Auth Provider
+  consumerKey: process.env.SALESFORCE_CONSUMER_KEY || process.env.SALESFORCE_CLIENT_ID,
+  consumerSecret: process.env.SALESFORCE_CONSUMER_SECRET || process.env.SALESFORCE_CLIENT_SECRET,
+  // Instance URL (will be obtained from token response)
+  instanceUrl: process.env.SALESFORCE_INSTANCE_URL || null
 };
 
-// Validate required environment variables (only if credentials are provided)
-if (SALESFORCE_CONFIG.clientId && SALESFORCE_CONFIG.clientSecret) {
-  console.log('✅ Salesforce credentials detected');
+// Token storage
+let accessToken = null;
+let instanceUrl = null;
+let tokenExpiry = null;
+
+// Validate credentials
+if (SALESFORCE_CONFIG.consumerKey && SALESFORCE_CONFIG.consumerSecret) {
+  console.log('✅ Salesforce Auth Provider credentials detected');
 } else {
   console.log('⚠️  Salesforce credentials not configured - Salesforce endpoints will be disabled');
-  console.log('   Set SALESFORCE_CLIENT_ID and SALESFORCE_CLIENT_SECRET to enable Salesforce integration');
+  console.log('   Set SALESFORCE_CONSUMER_KEY and SALESFORCE_CONSUMER_SECRET to enable Salesforce integration');
 }
-
-// Salesforce connection instance
-let conn = null;
-let accessToken = null;
-let tokenExpiry = null;
 
 /**
  * Authenticate with Salesforce using OAuth 2.0 Client Credentials flow
- * @returns {Promise<Object>} Connection object
+ * Uses Auth Provider token endpoint: https://login.salesforce.com/services/oauth2/token
+ * @returns {Promise<string>} Access token
  */
 async function authenticateSalesforce() {
   try {
     // Check if credentials are configured
-    if (!SALESFORCE_CONFIG.clientId || !SALESFORCE_CONFIG.clientSecret) {
+    if (!SALESFORCE_CONFIG.consumerKey || !SALESFORCE_CONFIG.consumerSecret) {
       throw new Error('Salesforce credentials not configured');
     }
 
     // Check if we have a valid token
     if (accessToken && tokenExpiry && Date.now() < tokenExpiry) {
-      return conn;
+      return accessToken;
     }
 
     console.log('Authenticating with Salesforce using OAuth 2.0 Client Credentials flow...');
-    console.log(`Login URL: ${SALESFORCE_CONFIG.loginUrl}`);
+    console.log(`Token endpoint: ${SALESFORCE_CONFIG.tokenEndpoint}`);
+    console.log(`Consumer Key: ${SALESFORCE_CONFIG.consumerKey.substring(0, 20)}...`);
     
-    // For OAuth 2.0 Client Credentials flow, the token endpoint MUST use standard Salesforce login domains
-    // NOT the instance-specific URL. The instance URL is only used for API calls after authentication.
-    // Token endpoints:
-    // - Production: https://login.salesforce.com/services/oauth2/token
-    // - Sandbox: https://test.salesforce.com/services/oauth2/token
-    let tokenUrl;
-    
-    // Allow manual override via environment variable
-    if (process.env.SALESFORCE_TOKEN_ENDPOINT) {
-      tokenUrl = process.env.SALESFORCE_TOKEN_ENDPOINT;
-      console.log(`Using manual token endpoint override: ${tokenUrl}`);
-    } else {
-      // Determine if this is a sandbox based on the login URL
-      // Note: Developer Edition orgs (develop.my.salesforce.com) should use login.salesforce.com
-      const loginUrl = SALESFORCE_CONFIG.loginUrl.trim().toLowerCase();
-      const isSandbox = loginUrl.includes('test.salesforce.com') || 
-                        loginUrl.includes('sandbox.my.salesforce.com') || 
-                        (loginUrl.includes('--') && loginUrl.includes('.sandbox.my.salesforce.com')) ||
-                        loginUrl.includes('.cs') ||
-                        loginUrl.includes('.sandbox.');
-      
-      // Use standard Salesforce login domains for token endpoint
-      // Production, Developer Edition, and most orgs use login.salesforce.com
-      // Only actual sandboxes use test.salesforce.com
-      if (isSandbox) {
-        tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
-        console.log('Detected sandbox environment, using test.salesforce.com for token endpoint');
-      } else {
-        tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
-        console.log('Using production token endpoint: login.salesforce.com');
-      }
-      
-      console.log(`Token endpoint: ${tokenUrl}`);
-      console.log(`Instance URL (for API calls): ${SALESFORCE_CONFIG.loginUrl}`);
-    }
+    const https = require('https');
     
     // Prepare the request body for Client Credentials flow
-    const https = require('https');
-    const http = require('http');
-    const url = require('url');
-    
     const tokenRequestData = new URLSearchParams({
       grant_type: 'client_credentials',
-      client_id: SALESFORCE_CONFIG.clientId,
-      client_secret: SALESFORCE_CONFIG.clientSecret
+      client_id: SALESFORCE_CONFIG.consumerKey,
+      client_secret: SALESFORCE_CONFIG.consumerSecret
     }).toString();
-
-    // Validate tokenUrl is correct
-    if (!tokenUrl.startsWith('https://')) {
-      throw new Error(`Invalid token URL: ${tokenUrl}. Must use HTTPS.`);
-    }
     
-    console.log(`Making token request to: ${tokenUrl}`);
+    const parsedUrl = new URL(SALESFORCE_CONFIG.tokenEndpoint);
     
-    // Make token request using native Node.js https/http
-    const parsedUrl = new URL(tokenUrl);
-    
-    // Ensure we're using HTTPS
-    if (parsedUrl.protocol !== 'https:') {
-      throw new Error(`Token URL must use HTTPS, got: ${parsedUrl.protocol}`);
-    }
-    
-    const requestModule = https; // Always use HTTPS for Salesforce
-    
+    // Make token request
     const tokenResponse = await new Promise((resolve, reject) => {
       const options = {
         hostname: parsedUrl.hostname,
@@ -126,14 +79,7 @@ async function authenticateSalesforce() {
         }
       };
       
-      console.log(`Request options:`, {
-        hostname: options.hostname,
-        port: options.port,
-        path: options.path,
-        method: options.method
-      });
-
-      const req = requestModule.request(options, (res) => {
+      const req = https.request(options, (res) => {
         let data = '';
         res.on('data', (chunk) => {
           data += chunk;
@@ -143,7 +89,6 @@ async function authenticateSalesforce() {
           if (res.statusCode >= 200 && res.statusCode < 300) {
             try {
               const parsed = JSON.parse(data);
-              console.log('Token request successful');
               resolve(parsed);
             } catch (e) {
               console.error('Failed to parse token response:', data);
@@ -151,7 +96,7 @@ async function authenticateSalesforce() {
             }
           } else {
             console.error(`Token request failed with status ${res.statusCode}`);
-            console.error('Response data:', data.substring(0, 500)); // Log first 500 chars
+            console.error('Response data:', data.substring(0, 500));
             reject(new Error(`Token request failed: ${res.statusCode} - ${data.substring(0, 200)}`));
           }
         });
@@ -167,23 +112,11 @@ async function authenticateSalesforce() {
 
     // Extract token and instance URL from response
     accessToken = tokenResponse.access_token;
-    const instanceUrl = tokenResponse.instance_url;
+    instanceUrl = tokenResponse.instance_url || SALESFORCE_CONFIG.instanceUrl;
     
-    // Calculate token expiry (typically expires in 2 hours, but use actual expires_in if provided)
+    // Calculate token expiry
     const expiresIn = tokenResponse.expires_in || 7200; // Default to 2 hours
     tokenExpiry = Date.now() + (expiresIn * 1000);
-    
-    // Create connection with the access token and instance URL
-    // For Client Credentials flow, we need to ensure the connection is properly initialized
-    conn = new jsforce.Connection({
-      accessToken: accessToken,
-      instanceUrl: instanceUrl,
-      version: '63.0' // Set API version
-    });
-    
-    // Explicitly set accessToken and instanceUrl on the connection object
-    conn.accessToken = accessToken;
-    conn.instanceUrl = instanceUrl;
     
     console.log('✅ Successfully authenticated with Salesforce');
     console.log(`Instance URL: ${instanceUrl}`);
@@ -191,27 +124,28 @@ async function authenticateSalesforce() {
     console.log(`Access Token: ${accessToken.substring(0, 20)}...`);
     console.log(`Token type: ${tokenResponse.token_type || 'Bearer'}`);
     
-    return conn;
+    return accessToken;
   } catch (error) {
     console.error('❌ Salesforce authentication failed:', error.message);
-    if (error.message && error.message.includes('Token request failed')) {
-      console.error('Full error details:', error.message);
-    }
     throw error;
   }
 }
 
 /**
- * Ensure Salesforce connection is authenticated
+ * Ensure Salesforce is authenticated and return access token
+ * @returns {Promise<string>} Access token
  */
 async function ensureAuthenticated() {
-  if (!SALESFORCE_CONFIG.clientId || !SALESFORCE_CONFIG.clientSecret) {
+  if (!SALESFORCE_CONFIG.consumerKey || !SALESFORCE_CONFIG.consumerSecret) {
     throw new Error('Salesforce credentials not configured');
   }
-  if (!conn || !accessToken || Date.now() >= tokenExpiry) {
+  if (!accessToken || !tokenExpiry || Date.now() >= tokenExpiry) {
     await authenticateSalesforce();
   }
-  return conn;
+  if (!instanceUrl) {
+    throw new Error('Instance URL not available. Authentication may have failed.');
+  }
+  return accessToken;
 }
 
 // Routes
@@ -455,8 +389,8 @@ app.post('/api/salesforce/create-member', async (req, res) => {
       });
     }
 
-    // Ensure authenticated
-    const connection = await ensureAuthenticated();
+    // Ensure authenticated and get access token
+    const token = await ensureAuthenticated();
 
     // Prepare Flow API request body
     const flowRequestBody = {
@@ -471,22 +405,58 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     const apiVersion = '63.0';
     const flowApiName = 'Create_Member_API';
     
-    // Construct the Flow API endpoint path
+    // Construct the Flow API endpoint URL
     const flowApiPath = `/services/data/v${apiVersion}/actions/custom/flow/${flowApiName}`;
+    const flowApiUrl = `${instanceUrl}${flowApiPath}`;
 
     console.log('Calling Salesforce Flow API:', flowApiName);
+    console.log(`Full URL: ${flowApiUrl}`);
     console.log('Request body:', JSON.stringify(flowRequestBody, null, 2));
 
-    // Make REST API call to Salesforce Flow using jsforce request method
-    // The request method automatically handles authentication headers
-    // Note: body must be a JSON string, not an object (to avoid chunk error)
-    const result = await connection.request({
-      method: 'POST',
-      url: flowApiPath,
-      body: JSON.stringify(flowRequestBody),
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    // Make direct REST API call to Salesforce Flow
+    const https = require('https');
+    const parsedUrl = new URL(flowApiUrl);
+    const requestBody = JSON.stringify(flowRequestBody);
+    
+    const result = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port || 443,
+        path: parsedUrl.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Content-Length': Buffer.byteLength(requestBody)
+        }
+      };
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          console.log(`Flow API response status: ${res.statusCode}`);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(new Error(`Failed to parse Flow API response: ${e.message}`));
+            }
+          } else {
+            console.error('Flow API error response:', data);
+            reject(new Error(`Flow API request failed: ${res.statusCode} - ${data.substring(0, 200)}`));
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        reject(error);
+      });
+      
+      req.write(requestBody);
+      req.end();
     });
 
     console.log('Flow API Response:', JSON.stringify(result, null, 2));
