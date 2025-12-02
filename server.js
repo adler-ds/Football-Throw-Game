@@ -480,16 +480,16 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     
     console.log(`Using access token: ${connection.accessToken.substring(0, 20)}...`);
     console.log(`Instance URL: ${connection.instanceUrl}`);
+    console.log(`Full endpoint URL: ${connection.instanceUrl}${flowApiPath}`);
     
-    // Make the request with proper headers
-    // jsforce should add Authorization header automatically, but we'll ensure it's set
+    // Make the request - jsforce should automatically add Authorization header
+    // Don't override headers to let jsforce handle authentication
     const result = await connection.request({
       method: 'POST',
       url: flowApiPath,
       body: JSON.stringify(flowRequestBody),
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${connection.accessToken}`
+        'Content-Type': 'application/json'
       }
     });
 
