@@ -200,13 +200,6 @@ async function ensureAuthenticated() {
   if (!conn || !accessToken || Date.now() >= tokenExpiry) {
     await authenticateSalesforce();
   }
-  
-  // Verify connection has accessToken and instanceUrl
-  if (!conn.accessToken || !conn.instanceUrl) {
-    console.warn('Connection missing accessToken or instanceUrl, re-authenticating...');
-    await authenticateSalesforce();
-  }
-  
   return conn;
 }
 
@@ -474,42 +467,11 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     console.log('Request body:', JSON.stringify(flowRequestBody, null, 2));
 
     // Make REST API call to Salesforce Flow using jsforce request method
-    // Ensure we have a valid access token
-    if (!connection.accessToken) {
-      console.error('Connection accessToken is missing, re-authenticating...');
-      await authenticateSalesforce();
-      // Get the refreshed connection
-      const refreshedConnection = await ensureAuthenticated();
-      if (!refreshedConnection.accessToken) {
-        throw new Error('Failed to obtain access token after re-authentication');
-      }
-      connection = refreshedConnection;
-    }
-    
-    console.log(`Using access token: ${connection.accessToken.substring(0, 20)}...`);
-    console.log(`Instance URL: ${connection.instanceUrl}`);
-    console.log(`Full endpoint URL: ${connection.instanceUrl}${flowApiPath}`);
-    
-    // Verify connection is working by checking if it can make API calls
-    // Test with a simple query first to ensure the token is valid
-    try {
-      const testQuery = await connection.query('SELECT Id FROM Organization LIMIT 1');
-      console.log('✅ Connection test successful - token is valid for REST API');
-    } catch (testError) {
-      console.error('❌ Connection test failed:', testError.message);
-      throw new Error(`Salesforce connection invalid: ${testError.message}`);
-    }
-    
-    // Use jsforce's request method - it should handle authentication automatically
-    // The body needs to be a string (not an object) to avoid the chunk error
-    // jsforce will automatically add the Authorization header from the connection
+    // The request method automatically handles authentication headers
     const result = await connection.request({
       method: 'POST',
       url: flowApiPath,
-      body: JSON.stringify(flowRequestBody),
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      body: flowRequestBody
     });
 
     console.log('Flow API Response:', JSON.stringify(result, null, 2));
