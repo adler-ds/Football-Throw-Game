@@ -47,31 +47,97 @@ async function authenticateSalesforce() {
       return conn;
     }
 
-    console.log('Authenticating with Salesforce...');
+    console.log('Authenticating with Salesforce using OAuth 2.0 Client Credentials flow...');
+    console.log(`Login URL: ${SALESFORCE_CONFIG.loginUrl}`);
     
-    // Create connection using OAuth 2.0 Client Credentials flow
-    conn = new jsforce.Connection({
-      oauth2: {
-        loginUrl: SALESFORCE_CONFIG.loginUrl,
-        clientId: SALESFORCE_CONFIG.clientId,
-        clientSecret: SALESFORCE_CONFIG.clientSecret
-      }
+    // Create OAuth2 instance for Client Credentials flow
+    const oauth2 = new jsforce.OAuth2({
+      loginUrl: SALESFORCE_CONFIG.loginUrl,
+      clientId: SALESFORCE_CONFIG.clientId,
+      clientSecret: SALESFORCE_CONFIG.clientSecret
     });
 
-    // Authenticate using client credentials
-    const userInfo = await conn.login();
+    // For Client Credentials flow, we need to make a direct token request
+    // Build the token endpoint URL
+    const tokenUrl = `${SALESFORCE_CONFIG.loginUrl}/services/oauth2/token`;
     
-    // Store token and calculate expiry (typically expires in 2 hours)
-    accessToken = conn.accessToken;
-    tokenExpiry = Date.now() + (2 * 60 * 60 * 1000); // 2 hours from now
+    // Prepare the request body for Client Credentials flow
+    const https = require('https');
+    const http = require('http');
+    const url = require('url');
+    
+    const tokenRequestData = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: SALESFORCE_CONFIG.clientId,
+      client_secret: SALESFORCE_CONFIG.clientSecret
+    }).toString();
+
+    // Make token request using native Node.js https/http
+    const parsedUrl = new URL(tokenUrl);
+    const requestModule = parsedUrl.protocol === 'https:' ? https : http;
+    
+    const tokenResponse = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+        path: parsedUrl.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(tokenRequestData)
+        }
+      };
+
+      const req = requestModule.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(new Error(`Failed to parse token response: ${e.message}`));
+            }
+          } else {
+            reject(new Error(`Token request failed: ${res.statusCode} - ${data}`));
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        reject(error);
+      });
+
+      req.write(tokenRequestData);
+      req.end();
+    });
+
+    // Extract token and instance URL from response
+    accessToken = tokenResponse.access_token;
+    const instanceUrl = tokenResponse.instance_url;
+    
+    // Calculate token expiry (typically expires in 2 hours, but use actual expires_in if provided)
+    const expiresIn = tokenResponse.expires_in || 7200; // Default to 2 hours
+    tokenExpiry = Date.now() + (expiresIn * 1000);
+    
+    // Create connection with the access token
+    conn = new jsforce.Connection({
+      accessToken: accessToken,
+      instanceUrl: instanceUrl
+    });
     
     console.log('✅ Successfully authenticated with Salesforce');
-    console.log(`User ID: ${userInfo.id}`);
-    console.log(`Organization ID: ${userInfo.organizationId}`);
+    console.log(`Instance URL: ${instanceUrl}`);
+    console.log(`Token expires in: ${expiresIn} seconds`);
     
     return conn;
   } catch (error) {
     console.error('❌ Salesforce authentication failed:', error.message);
+    if (error.message && error.message.includes('Token request failed')) {
+      console.error('Full error details:', error.message);
+    }
     throw error;
   }
 }
