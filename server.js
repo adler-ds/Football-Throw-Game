@@ -97,7 +97,27 @@ async function authenticateSalesforce() {
           } else {
             console.error(`Token request failed with status ${res.statusCode}`);
             console.error('Response data:', data.substring(0, 500));
-            reject(new Error(`Token request failed: ${res.statusCode} - ${data.substring(0, 200)}`));
+            
+            // Parse error response for better error messages
+            let errorMessage = `Token request failed: ${res.statusCode}`;
+            try {
+              const errorData = JSON.parse(data);
+              if (errorData.error === 'invalid_grant' && errorData.error_description) {
+                if (errorData.error_description.includes('request not supported on this domain')) {
+                  errorMessage = `Client Credentials flow not supported: ${errorData.error_description}. ` +
+                    `The Consumer Key/Secret from Auth Provider may not support Client Credentials flow. ` +
+                    `You may need to use a Connected App instead, or configure the Auth Provider to support this flow.`;
+                } else {
+                  errorMessage = `Authentication failed: ${errorData.error_description}`;
+                }
+              } else {
+                errorMessage = `Token request failed: ${res.statusCode} - ${data.substring(0, 200)}`;
+              }
+            } catch (e) {
+              errorMessage = `Token request failed: ${res.statusCode} - ${data.substring(0, 200)}`;
+            }
+            
+            reject(new Error(errorMessage));
           }
         });
       });
