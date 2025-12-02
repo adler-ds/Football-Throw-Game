@@ -13,12 +13,13 @@ app.use(require('cors')());
 // Salesforce Configuration - Using Connected App credentials
 const SALESFORCE_CONFIG = {
   // Token Endpoint for OAuth 2.0 Client Credentials flow
-  tokenEndpoint: 'https://login.salesforce.com/services/oauth2/token',
+  // Try instance URL first if provided, otherwise use standard login domain
+  tokenEndpoint: process.env.SALESFORCE_TOKEN_ENDPOINT || 'https://login.salesforce.com/services/oauth2/token',
   // Consumer Key and Secret from Connected App
   // Supports both naming conventions for flexibility
   consumerKey: process.env.SALESFORCE_CONSUMER_KEY || process.env.SALESFORCE_CLIENT_ID,
   consumerSecret: process.env.SALESFORCE_CONSUMER_SECRET || process.env.SALESFORCE_CLIENT_SECRET,
-  // Instance URL (will be obtained from token response)
+  // Instance URL (will be obtained from token response, or can be set manually)
   instanceUrl: process.env.SALESFORCE_INSTANCE_URL || null
 };
 
@@ -103,13 +104,25 @@ async function authenticateSalesforce() {
             
             // Parse error response for better error messages
             let errorMessage = `Token request failed: ${res.statusCode}`;
+            let errorData = null;
             try {
-              const errorData = JSON.parse(data);
+              errorData = JSON.parse(data);
               if (errorData.error === 'invalid_grant' && errorData.error_description) {
                 if (errorData.error_description.includes('request not supported on this domain')) {
-                  errorMessage = `Client Credentials flow not supported: ${errorData.error_description}. ` +
-                    `The Consumer Key/Secret from Auth Provider may not support Client Credentials flow. ` +
-                    `You may need to use a Connected App instead, or configure the Auth Provider to support this flow.`;
+                  errorMessage = `Client Credentials flow not supported: ${errorData.error_description}\n\n` +
+                    `Troubleshooting steps:\n` +
+                    `1. Verify your Connected App has "Enable Client Credentials Flow" checked\n` +
+                    `2. Set "Permitted Users" to "Admin approved users are pre-authorized"\n` +
+                    `3. Select a "Run As User" in the Connected App settings\n` +
+                    `4. Ensure the "Manage user data via APIs (api)" scope is selected\n` +
+                    `5. Verify Consumer Key and Secret match the Connected App (not Auth Provider)\n` +
+                    `6. If using My Domain, try setting SALESFORCE_TOKEN_ENDPOINT to your instance URL + /services/oauth2/token`;
+                } else if (errorData.error_description.includes('no client credentials user enabled')) {
+                  errorMessage = `Client Credentials flow not configured: ${errorData.error_description}\n\n` +
+                    `Your Connected App needs:\n` +
+                    `- "Permitted Users" set to "Admin approved users are pre-authorized"\n` +
+                    `- A "Run As User" selected\n` +
+                    `- "Enable Client Credentials Flow" checked`;
                 } else {
                   errorMessage = `Authentication failed: ${errorData.error_description}`;
                 }
