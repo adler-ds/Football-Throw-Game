@@ -10,11 +10,12 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 app.use(require('cors')());
 
-// Salesforce Configuration - Using Auth Provider details
+// Salesforce Configuration - Using Connected App credentials
 const SALESFORCE_CONFIG = {
-  // Auth Provider Token Endpoint (from Auth Provider configuration)
+  // Token Endpoint for OAuth 2.0 Client Credentials flow
   tokenEndpoint: 'https://login.salesforce.com/services/oauth2/token',
-  // Consumer Key and Secret from Auth Provider
+  // Consumer Key and Secret from Connected App
+  // Supports both naming conventions for flexibility
   consumerKey: process.env.SALESFORCE_CONSUMER_KEY || process.env.SALESFORCE_CLIENT_ID,
   consumerSecret: process.env.SALESFORCE_CONSUMER_SECRET || process.env.SALESFORCE_CLIENT_SECRET,
   // Instance URL (will be obtained from token response)
@@ -28,10 +29,12 @@ let tokenExpiry = null;
 
 // Validate credentials
 if (SALESFORCE_CONFIG.consumerKey && SALESFORCE_CONFIG.consumerSecret) {
-  console.log('✅ Salesforce Auth Provider credentials detected');
+  console.log('✅ Salesforce Connected App credentials detected');
+  console.log(`   Using Consumer Key: ${SALESFORCE_CONFIG.consumerKey.substring(0, 20)}...`);
+  console.log(`   Token Endpoint: ${SALESFORCE_CONFIG.tokenEndpoint}`);
 } else {
   console.log('⚠️  Salesforce credentials not configured - Salesforce endpoints will be disabled');
-  console.log('   Set SALESFORCE_CONSUMER_KEY and SALESFORCE_CONSUMER_SECRET to enable Salesforce integration');
+  console.log('   Set SALESFORCE_CLIENT_ID and SALESFORCE_CLIENT_SECRET (or SALESFORCE_CONSUMER_KEY/SECRET)');
 }
 
 /**
