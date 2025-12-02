@@ -63,20 +63,23 @@ async function authenticateSalesforce() {
       console.log(`Using manual token endpoint override: ${tokenUrl}`);
     } else {
       // Determine if this is a sandbox based on the login URL
+      // Note: Developer Edition orgs (develop.my.salesforce.com) should use login.salesforce.com
       const loginUrl = SALESFORCE_CONFIG.loginUrl.trim().toLowerCase();
-      const isSandbox = loginUrl.includes('test.') || 
-                        loginUrl.includes('sandbox.') || 
-                        loginUrl.includes('--') ||
+      const isSandbox = loginUrl.includes('test.salesforce.com') || 
+                        loginUrl.includes('sandbox.my.salesforce.com') || 
+                        (loginUrl.includes('--') && loginUrl.includes('.sandbox.my.salesforce.com')) ||
                         loginUrl.includes('.cs') ||
-                        loginUrl.includes('develop.my.salesforce.com');
+                        loginUrl.includes('.sandbox.');
       
       // Use standard Salesforce login domains for token endpoint
+      // Production, Developer Edition, and most orgs use login.salesforce.com
+      // Only actual sandboxes use test.salesforce.com
       if (isSandbox) {
         tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
         console.log('Detected sandbox environment, using test.salesforce.com for token endpoint');
       } else {
         tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
-        console.log('Detected production environment, using login.salesforce.com for token endpoint');
+        console.log('Using production token endpoint: login.salesforce.com');
       }
       
       console.log(`Token endpoint: ${tokenUrl}`);
