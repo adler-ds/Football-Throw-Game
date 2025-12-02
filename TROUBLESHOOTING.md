@@ -51,14 +51,14 @@ You should see:
 2. **Wrong login URL format:**
    - Should be: `https://your-instance.salesforce.com` or `https://your-instance.my.salesforce.com`
    - For sandboxes: `https://your-instance--sandboxname.sandbox.my.salesforce.com`
-   - For your instance: `https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce-setup.com`
+   - For your instance: `https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce.com`
 
 ## Step 3: Test Authentication Directly
 
 You can test the OAuth 2.0 Client Credentials flow directly using curl:
 
 ```bash
-curl -X POST https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce-setup.com/services/oauth2/token \
+curl -X POST https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce.com/services/oauth2/token \
   -d "grant_type=client_credentials" \
   -d "client_id=YOUR_CONSUMER_KEY" \
   -d "client_secret=YOUR_CONSUMER_SECRET" \
@@ -137,7 +137,7 @@ The login URL must match your Salesforce instance exactly:
 
 - Production: `https://login.salesforce.com` or `https://yourinstance.salesforce.com`
 - Sandbox: `https://test.salesforce.com` or `https://yourinstance--sandbox.sandbox.my.salesforce.com`
-- Your instance: `https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce-setup.com`
+- Your instance: `https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce.com`
 
 ### Solution 3: Enable Client Credentials Flow
 

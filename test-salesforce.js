@@ -11,7 +11,7 @@ require('dotenv').config();
 const jsforce = require('jsforce');
 
 const SALESFORCE_CONFIG = {
-  loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce-setup.com',
+  loginUrl: process.env.SALESFORCE_LOGIN_URL || 'https://loyaltysampleappcom-a-dev-ed.develop.my.salesforce.com',
   clientId: process.env.SALESFORCE_CLIENT_ID,
   clientSecret: process.env.SALESFORCE_CLIENT_SECRET
 };

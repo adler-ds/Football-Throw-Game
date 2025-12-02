@@ -71,5 +71,5 @@ The code should automatically:
 - Use `https://test.salesforce.com/services/oauth2/token` for sandboxes
 - Use `https://login.salesforce.com/services/oauth2/token` for production
 
-Your instance URL `loyaltysampleappcom-a-dev-ed.develop.my.salesforce-setup.com` contains both `-dev-ed` and `develop`, so it should definitely use `test.salesforce.com`.
+Your instance URL `loyaltysampleappcom-a-dev-ed.develop.my.salesforce.com` contains both `-dev-ed` and `develop`, so it should definitely use `test.salesforce.com`.
 
