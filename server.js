@@ -200,6 +200,13 @@ async function ensureAuthenticated() {
   if (!conn || !accessToken || Date.now() >= tokenExpiry) {
     await authenticateSalesforce();
   }
+  
+  // Verify connection has accessToken and instanceUrl
+  if (!conn.accessToken || !conn.instanceUrl) {
+    console.warn('Connection missing accessToken or instanceUrl, re-authenticating...');
+    await authenticateSalesforce();
+  }
+  
   return conn;
 }
 
