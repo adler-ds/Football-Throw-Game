@@ -490,6 +490,16 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     console.log(`Instance URL: ${connection.instanceUrl}`);
     console.log(`Full endpoint URL: ${connection.instanceUrl}${flowApiPath}`);
     
+    // Verify connection is working by checking if it can make API calls
+    // Test with a simple query first to ensure the token is valid
+    try {
+      const testQuery = await connection.query('SELECT Id FROM Organization LIMIT 1');
+      console.log('✅ Connection test successful - token is valid for REST API');
+    } catch (testError) {
+      console.error('❌ Connection test failed:', testError.message);
+      throw new Error(`Salesforce connection invalid: ${testError.message}`);
+    }
+    
     // Use jsforce's request method - it should handle authentication automatically
     // The body needs to be a string (not an object) to avoid the chunk error
     // jsforce will automatically add the Authorization header from the connection
