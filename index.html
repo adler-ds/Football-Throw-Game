@@ -38,6 +38,20 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        // Check if player is registered
+        window.addEventListener('DOMContentLoaded', () => {
+            const playerData = sessionStorage.getItem('playerData');
+            if (!playerData) {
+                // Redirect to registration page
+                window.location.href = '/register';
+            } else {
+                // Player is registered, load game
+                const script = document.createElement('script');
+                script.src = 'script.js';
+                document.body.appendChild(script);
+            }
+        });
+    </script>
 </body>
 </html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Football Throwing Game</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .registration-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 70%, #228B22 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .registration-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .registration-card h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .registration-card p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .form-group input.error {
+            border-color: #ef4444;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            background: #45a049;
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .api-error {
+            background: #fee;
+            border: 2px solid #ef4444;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .api-error.show {
+            display: block;
+        }
+
+        .retry-btn {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .retry-btn:hover {
+            background: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <div class="registration-container">
+        <div class="registration-card">
+            <h1>🏈 Welcome!</h1>
+            <p>Please enter your information to start playing</p>
+            
+            <form id="registrationForm">
+                <div class="form-group">
+                    <label for="firstName">First Name <span style="color: #ef4444;">*</span></label>
+                    <input type="text" id="firstName" name="firstName" required>
+                    <div class="error-message" id="firstNameError">First name is required</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="lastName">Last Name <span style="color: #ef4444;">*</span></label>
+                    <input type="text" id="lastName" name="lastName" required>
+                    <div class="error-message" id="lastNameError">Last name is required</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email <span style="color: #ef4444;">*</span></label>
+                    <input type="email" id="email" name="email" required>
+                    <div class="error-message" id="emailError">Valid email is required</div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">Start Game</button>
+            </form>
+
+            <div class="loading" id="loading">
+                <p>Creating your account...</p>
+            </div>
+
+            <div class="api-error" id="apiError">
+                <strong>Error:</strong> <span id="errorMessage"></span>
+                <br>
+                <button class="retry-btn" onclick="retrySubmission()">Try Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Store player data
+        let playerData = {
+            firstName: '',
+            lastName: '',
+            email: '',
+            memberId: null
+        };
+
+        // Form validation
+        function validateForm() {
+            let isValid = true;
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const email = document.getElementById('email').value.trim();
+
+            // Validate first name
+            if (!firstName) {
+                showError('firstNameError', 'First name is required');
+                document.getElementById('firstName').classList.add('error');
+                isValid = false;
+            } else {
+                hideError('firstNameError');
+                document.getElementById('firstName').classList.remove('error');
+            }
+
+            // Validate last name
+            if (!lastName) {
+                showError('lastNameError', 'Last name is required');
+                document.getElementById('lastName').classList.add('error');
+                isValid = false;
+            } else {
+                hideError('lastNameError');
+                document.getElementById('lastName').classList.remove('error');
+            }
+
+            // Validate email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!email) {
+                showError('emailError', 'Email is required');
+                document.getElementById('email').classList.add('error');
+                isValid = false;
+            } else if (!emailRegex.test(email)) {
+                showError('emailError', 'Please enter a valid email address');
+                document.getElementById('email').classList.add('error');
+                isValid = false;
+            } else {
+                hideError('emailError');
+                document.getElementById('email').classList.remove('error');
+            }
+
+            return isValid;
+        }
+
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.classList.add('show');
+        }
+
+        function hideError(elementId) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.classList.remove('show');
+        }
+
+        // Handle form submission
+        document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!validateForm()) {
+                return;
+            }
+
+            // Get form values
+            playerData.firstName = document.getElementById('firstName').value.trim();
+            playerData.lastName = document.getElementById('lastName').value.trim();
+            playerData.email = document.getElementById('email').value.trim();
+
+            // Show loading state
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('apiError').classList.remove('show');
+
+            try {
+                // Call API to create member in Salesforce
+                const response = await fetch('/api/salesforce/create-member', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        firstName: playerData.firstName,
+                        lastName: playerData.lastName,
+                        email: playerData.email
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || data.message || 'Failed to create member');
+                }
+
+                if (data.success && data.memberId) {
+                    // Store MemberID
+                    playerData.memberId = data.memberId;
+                    
+                    // Store in sessionStorage for use in game
+                    sessionStorage.setItem('playerData', JSON.stringify(playerData));
+                    
+                    // Redirect to game
+                    window.location.href = 'index.html';
+                } else {
+                    throw new Error(data.error || 'Failed to create member');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                document.getElementById('errorMessage').textContent = error.message || 'An error occurred. Please try again.';
+                document.getElementById('apiError').classList.add('show');
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('loading').classList.remove('show');
+            }
+        });
+
+        // Retry submission
+        function retrySubmission() {
+            document.getElementById('apiError').classList.remove('show');
+            document.getElementById('submitBtn').disabled = false;
+        }
+
+        // Real-time validation
+        document.getElementById('firstName').addEventListener('blur', validateForm);
+        document.getElementById('lastName').addEventListener('blur', validateForm);
+        document.getElementById('email').addEventListener('blur', validateForm);
+    </script>
+</body>
+</html>
+
