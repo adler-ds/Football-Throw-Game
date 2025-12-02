@@ -50,9 +50,11 @@ async function authenticateSalesforce() {
     console.log('Authenticating with Salesforce using OAuth 2.0 Client Credentials flow...');
     console.log(`Login URL: ${SALESFORCE_CONFIG.loginUrl}`);
     
-    // For OAuth 2.0 Client Credentials flow, use the instance-specific URL
-    // According to Salesforce documentation, the token endpoint should use the specific instance URL
-    // Check for manual override first, then use the instance URL from configuration
+    // For OAuth 2.0 Client Credentials flow, the token endpoint MUST use standard Salesforce login domains
+    // NOT the instance-specific URL. The instance URL is only used for API calls after authentication.
+    // Token endpoints:
+    // - Production: https://login.salesforce.com/services/oauth2/token
+    // - Sandbox: https://test.salesforce.com/services/oauth2/token
     let tokenUrl;
     
     // Allow manual override via environment variable
@@ -60,19 +62,25 @@ async function authenticateSalesforce() {
       tokenUrl = process.env.SALESFORCE_TOKEN_ENDPOINT;
       console.log(`Using manual token endpoint override: ${tokenUrl}`);
     } else {
-      // Use the instance-specific URL from SALESFORCE_LOGIN_URL
-      // Construct the token endpoint using the same domain as the login URL
-      // For example: https://your-instance.salesforce.com/services/oauth2/token
-      const loginUrl = SALESFORCE_CONFIG.loginUrl.trim();
+      // Determine if this is a sandbox based on the login URL
+      const loginUrl = SALESFORCE_CONFIG.loginUrl.trim().toLowerCase();
+      const isSandbox = loginUrl.includes('test.') || 
+                        loginUrl.includes('sandbox.') || 
+                        loginUrl.includes('--') ||
+                        loginUrl.includes('.cs') ||
+                        loginUrl.includes('develop.my.salesforce.com');
       
-      // Remove trailing slash if present
-      const baseUrl = loginUrl.replace(/\/$/, '');
+      // Use standard Salesforce login domains for token endpoint
+      if (isSandbox) {
+        tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
+        console.log('Detected sandbox environment, using test.salesforce.com for token endpoint');
+      } else {
+        tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
+        console.log('Detected production environment, using login.salesforce.com for token endpoint');
+      }
       
-      // Construct token endpoint using the instance URL
-      tokenUrl = `${baseUrl}/services/oauth2/token`;
-      
-      console.log(`Using instance-specific token endpoint: ${tokenUrl}`);
-      console.log(`Based on login URL: ${loginUrl}`);
+      console.log(`Token endpoint: ${tokenUrl}`);
+      console.log(`Instance URL (for API calls): ${SALESFORCE_CONFIG.loginUrl}`);
     }
     
     // Prepare the request body for Client Credentials flow
