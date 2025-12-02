@@ -50,16 +50,29 @@ async function authenticateSalesforce() {
     console.log('Authenticating with Salesforce using OAuth 2.0 Client Credentials flow...');
     console.log(`Login URL: ${SALESFORCE_CONFIG.loginUrl}`);
     
-    // Create OAuth2 instance for Client Credentials flow
-    const oauth2 = new jsforce.OAuth2({
-      loginUrl: SALESFORCE_CONFIG.loginUrl,
-      clientId: SALESFORCE_CONFIG.clientId,
-      clientSecret: SALESFORCE_CONFIG.clientSecret
-    });
-
-    // For Client Credentials flow, we need to make a direct token request
-    // Build the token endpoint URL
-    const tokenUrl = `${SALESFORCE_CONFIG.loginUrl}/services/oauth2/token`;
+    // For Client Credentials flow, we MUST use the standard Salesforce login domain
+    // Custom domains (like .my.salesforce.com or .my.salesforce-setup.com) don't support OAuth token endpoints
+    // Determine if this is a sandbox or production instance
+    let tokenUrl;
+    const loginUrl = SALESFORCE_CONFIG.loginUrl.toLowerCase();
+    
+    // Check if it's a sandbox (contains -dev-ed, --, .sandbox., or test.salesforce.com)
+    if (loginUrl.includes('-dev-ed') || 
+        loginUrl.includes('--') || 
+        loginUrl.includes('.sandbox.') ||
+        loginUrl.includes('test.salesforce.com') ||
+        loginUrl.includes('cs') || // Community sandbox
+        loginUrl.includes('develop.my.salesforce')) {
+      // Sandbox - use test.salesforce.com
+      tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
+      console.log('Detected sandbox instance - using test.salesforce.com');
+    } else {
+      // Production - use login.salesforce.com
+      tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
+      console.log('Detected production instance - using login.salesforce.com');
+    }
+    
+    console.log(`Using token endpoint: ${tokenUrl}`);
     
     // Prepare the request body for Client Credentials flow
     const https = require('https');
