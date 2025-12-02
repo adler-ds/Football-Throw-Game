@@ -61,23 +61,21 @@ async function authenticateSalesforce() {
       console.log(`Using manual token endpoint override: ${tokenUrl}`);
     } else {
       // Auto-detect based on login URL
+      // Default to login.salesforce.com (production)
+      // Only use test.salesforce.com for explicit sandbox indicators
       const loginUrl = SALESFORCE_CONFIG.loginUrl.toLowerCase();
       
-      // Check if it's a sandbox (contains -dev-ed, --, .sandbox., or test.salesforce.com)
-      if (loginUrl.includes('-dev-ed') || 
-          loginUrl.includes('--') || 
-          loginUrl.includes('.sandbox.') ||
-          loginUrl.includes('test.salesforce.com') ||
-          loginUrl.includes('cs') || // Community sandbox
-          loginUrl.includes('develop.my.salesforce') ||
-          loginUrl.includes('my.salesforce-setup.com')) { // Custom setup domains are always sandboxes
-        // Sandbox - use test.salesforce.com
+      // Check if it's explicitly a sandbox
+      // Only use test.salesforce.com if we're very sure it's a sandbox
+      if (loginUrl.includes('test.salesforce.com') ||
+          (loginUrl.includes('--') && loginUrl.includes('.sandbox.'))) {
+        // Explicit sandbox - use test.salesforce.com
         tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
-        console.log('Detected sandbox instance - using test.salesforce.com');
+        console.log('Detected explicit sandbox instance - using test.salesforce.com');
       } else {
-        // Production - use login.salesforce.com
+        // Default to production - use login.salesforce.com
         tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
-        console.log('Detected production instance - using login.salesforce.com');
+        console.log('Using production login endpoint: login.salesforce.com');
       }
       
       console.log(`Using token endpoint: ${tokenUrl}`);
