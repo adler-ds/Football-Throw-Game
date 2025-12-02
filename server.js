@@ -482,15 +482,62 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     console.log(`Instance URL: ${connection.instanceUrl}`);
     console.log(`Full endpoint URL: ${connection.instanceUrl}${flowApiPath}`);
     
-    // Make the request - jsforce should automatically add Authorization header
-    // Don't override headers to let jsforce handle authentication
-    const result = await connection.request({
-      method: 'POST',
-      url: flowApiPath,
-      body: JSON.stringify(flowRequestBody),
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    // Make direct HTTP request to ensure Authorization header is properly set
+    // jsforce's request method might not always add the header correctly
+    const https = require('https');
+    const url = require('url');
+    
+    const fullUrl = `${connection.instanceUrl}${flowApiPath}`;
+    const parsedUrl = new URL(fullUrl);
+    
+    const requestBody = JSON.stringify(flowRequestBody);
+    
+    const result = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port || 443,
+        path: parsedUrl.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${connection.accessToken}`,
+          'Content-Length': Buffer.byteLength(requestBody)
+        }
+      };
+      
+      console.log('Making Flow API request with options:', {
+        hostname: options.hostname,
+        path: options.path,
+        method: options.method,
+        hasAuthHeader: !!options.headers.Authorization
+      });
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          console.log(`Flow API response status: ${res.statusCode}`);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(new Error(`Failed to parse Flow API response: ${e.message}`));
+            }
+          } else {
+            console.error('Flow API error response:', data);
+            reject(new Error(`Flow API request failed: ${res.statusCode} - ${data.substring(0, 200)}`));
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        reject(error);
+      });
+      
+      req.write(requestBody);
+      req.end();
     });
 
     console.log('Flow API Response:', JSON.stringify(result, null, 2));
