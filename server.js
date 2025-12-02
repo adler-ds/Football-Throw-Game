@@ -52,27 +52,36 @@ async function authenticateSalesforce() {
     
     // For Client Credentials flow, we MUST use the standard Salesforce login domain
     // Custom domains (like .my.salesforce.com or .my.salesforce-setup.com) don't support OAuth token endpoints
-    // Determine if this is a sandbox or production instance
+    // Check for manual override first, then auto-detect
     let tokenUrl;
-    const loginUrl = SALESFORCE_CONFIG.loginUrl.toLowerCase();
     
-    // Check if it's a sandbox (contains -dev-ed, --, .sandbox., or test.salesforce.com)
-    if (loginUrl.includes('-dev-ed') || 
-        loginUrl.includes('--') || 
-        loginUrl.includes('.sandbox.') ||
-        loginUrl.includes('test.salesforce.com') ||
-        loginUrl.includes('cs') || // Community sandbox
-        loginUrl.includes('develop.my.salesforce')) {
-      // Sandbox - use test.salesforce.com
-      tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
-      console.log('Detected sandbox instance - using test.salesforce.com');
+    // Allow manual override via environment variable
+    if (process.env.SALESFORCE_TOKEN_ENDPOINT) {
+      tokenUrl = process.env.SALESFORCE_TOKEN_ENDPOINT;
+      console.log(`Using manual token endpoint override: ${tokenUrl}`);
     } else {
-      // Production - use login.salesforce.com
-      tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
-      console.log('Detected production instance - using login.salesforce.com');
+      // Auto-detect based on login URL
+      const loginUrl = SALESFORCE_CONFIG.loginUrl.toLowerCase();
+      
+      // Check if it's a sandbox (contains -dev-ed, --, .sandbox., or test.salesforce.com)
+      if (loginUrl.includes('-dev-ed') || 
+          loginUrl.includes('--') || 
+          loginUrl.includes('.sandbox.') ||
+          loginUrl.includes('test.salesforce.com') ||
+          loginUrl.includes('cs') || // Community sandbox
+          loginUrl.includes('develop.my.salesforce') ||
+          loginUrl.includes('my.salesforce-setup.com')) { // Custom setup domains are always sandboxes
+        // Sandbox - use test.salesforce.com
+        tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
+        console.log('Detected sandbox instance - using test.salesforce.com');
+      } else {
+        // Production - use login.salesforce.com
+        tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
+        console.log('Detected production instance - using login.salesforce.com');
+      }
+      
+      console.log(`Using token endpoint: ${tokenUrl}`);
     }
-    
-    console.log(`Using token endpoint: ${tokenUrl}`);
     
     // Prepare the request body for Client Credentials flow
     const https = require('https');
