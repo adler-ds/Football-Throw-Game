@@ -459,14 +459,20 @@ app.post('/api/salesforce/create-member', async (req, res) => {
     console.log('Request body:', JSON.stringify(flowRequestBody, null, 2));
 
     // Make REST API call to Salesforce Flow using jsforce request method
-    // The request method automatically handles authentication headers
-    // Body must be a JSON string, not an object
+    // Ensure we have a valid access token
+    if (!connection.accessToken) {
+      throw new Error('No access token available. Please re-authenticate.');
+    }
+    
+    // Make the request with proper headers
+    // jsforce should add Authorization header automatically, but we'll ensure it's set
     const result = await connection.request({
       method: 'POST',
       url: flowApiPath,
       body: JSON.stringify(flowRequestBody),
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${connection.accessToken}`
       }
     });
 
