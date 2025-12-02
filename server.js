@@ -1,5 +1,4 @@
 const express = require('express');
-const jsforce = require('jsforce'); // Still needed for other endpoints
 const path = require('path');
 require('dotenv').config();
 
@@ -149,6 +148,70 @@ async function ensureAuthenticated() {
   return accessToken;
 }
 
+/**
+ * Make a REST API call to Salesforce
+ * @param {string} method - HTTP method (GET, POST, PUT, PATCH, DELETE)
+ * @param {string} path - API path (e.g., '/services/data/v63.0/query?q=SELECT...')
+ * @param {object} body - Request body (optional, will be JSON stringified)
+ * @returns {Promise<object>} Response data
+ */
+async function salesforceApiCall(method, path, body = null) {
+  const token = await ensureAuthenticated();
+  const https = require('https');
+  
+  // Construct full URL
+  const fullUrl = `${instanceUrl}${path}`;
+  const parsedUrl = new URL(fullUrl);
+  
+  // Prepare request body
+  const requestBody = body ? JSON.stringify(body) : null;
+  
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || 443,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    };
+    
+    if (requestBody) {
+      options.headers['Content-Length'] = Buffer.byteLength(requestBody);
+    }
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(new Error(`Failed to parse response: ${e.message}`));
+          }
+        } else {
+          console.error(`API call failed: ${res.statusCode} - ${data.substring(0, 200)}`);
+          reject(new Error(`API call failed: ${res.statusCode} - ${data.substring(0, 200)}`));
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      reject(error);
+    });
+    
+    if (requestBody) {
+      req.write(requestBody);
+    }
+    req.end();
+  });
+}
+
 // Routes
 
 // Health check endpoint
@@ -163,10 +226,9 @@ app.get('/api/health', (req, res) => {
 // Salesforce connection test endpoint
 app.get('/api/salesforce/test', async (req, res) => {
   try {
-    const connection = await ensureAuthenticated();
-    
     // Test query - get organization info
-    const orgInfo = await connection.query('SELECT Id, Name, OrganizationType FROM Organization LIMIT 1');
+    const soql = encodeURIComponent('SELECT Id, Name, OrganizationType FROM Organization LIMIT 1');
+    const orgInfo = await salesforceApiCall('GET', `/services/data/v63.0/query?q=${soql}`);
     
     res.json({
       success: true,
@@ -190,8 +252,8 @@ app.get('/api/salesforce/test', async (req, res) => {
 // Get Salesforce organization details
 app.get('/api/salesforce/org', async (req, res) => {
   try {
-    const connection = await ensureAuthenticated();
-    const orgInfo = await connection.query('SELECT Id, Name, OrganizationType, InstanceName, CreatedDate FROM Organization LIMIT 1');
+    const soql = encodeURIComponent('SELECT Id, Name, OrganizationType, InstanceName, CreatedDate FROM Organization LIMIT 1');
+    const orgInfo = await salesforceApiCall('GET', `/services/data/v63.0/query?q=${soql}`);
     
     res.json({
       success: true,
@@ -219,8 +281,8 @@ app.post('/api/salesforce/query', async (req, res) => {
       });
     }
 
-    const connection = await ensureAuthenticated();
-    const result = await connection.query(soql);
+    const encodedSoql = encodeURIComponent(soql);
+    const result = await salesforceApiCall('GET', `/services/data/v63.0/query?q=${encodedSoql}`);
     
     res.json({
       success: true,
@@ -249,10 +311,9 @@ app.post('/api/salesforce/create', async (req, res) => {
       });
     }
 
-    const connection = await ensureAuthenticated();
-    const result = await connection.sobject(sobjectType).create(record);
+    const result = await salesforceApiCall('POST', `/services/data/v63.0/sobjects/${sobjectType}/`, record);
     
-    if (result.success) {
+    if (result.success !== false && result.id) {
       res.json({
         success: true,
         id: result.id
@@ -260,7 +321,7 @@ app.post('/api/salesforce/create', async (req, res) => {
     } else {
       res.status(400).json({
         success: false,
-        errors: result.errors
+        errors: result.errors || [result.message || 'Unknown error']
       });
     }
   } catch (error) {
@@ -286,19 +347,20 @@ app.put('/api/salesforce/update/:id', async (req, res) => {
       });
     }
 
-    const connection = await ensureAuthenticated();
-    record.Id = id;
-    const result = await connection.sobject(sobjectType).update(record);
+    // Add Id to record for update
+    const updateRecord = { ...record, Id: id };
+    const result = await salesforceApiCall('PATCH', `/services/data/v63.0/sobjects/${sobjectType}/${id}`, updateRecord);
     
-    if (result.success) {
+    // PATCH returns empty body on success (204) or error details
+    if (!result || Object.keys(result).length === 0) {
       res.json({
         success: true,
-        id: result.id
+        id: id
       });
     } else {
       res.status(400).json({
         success: false,
-        errors: result.errors
+        errors: result.errors || [result.message || 'Unknown error']
       });
     }
   } catch (error) {
@@ -314,8 +376,7 @@ app.put('/api/salesforce/update/:id', async (req, res) => {
 // Get available Salesforce objects
 app.get('/api/salesforce/objects', async (req, res) => {
   try {
-    const connection = await ensureAuthenticated();
-    const globalDescribe = await connection.describeGlobal();
+    const globalDescribe = await salesforceApiCall('GET', '/services/data/v63.0/sobjects/');
     
     res.json({
       success: true,
@@ -340,8 +401,7 @@ app.get('/api/salesforce/objects', async (req, res) => {
 app.get('/api/salesforce/objects/:sobjectType', async (req, res) => {
   try {
     const { sobjectType } = req.params;
-    const connection = await ensureAuthenticated();
-    const metadata = await connection.sobject(sobjectType).describe();
+    const metadata = await salesforceApiCall('GET', `/services/data/v63.0/sobjects/${sobjectType}/describe/`);
     
     res.json({
       success: true,
