@@ -50,9 +50,9 @@ async function authenticateSalesforce() {
     console.log('Authenticating with Salesforce using OAuth 2.0 Client Credentials flow...');
     console.log(`Login URL: ${SALESFORCE_CONFIG.loginUrl}`);
     
-    // For Client Credentials flow, we MUST use the standard Salesforce login domain
-    // Custom domains (like .my.salesforce.com or .my.salesforce-setup.com) don't support OAuth token endpoints
-    // Check for manual override first, then auto-detect
+    // For OAuth 2.0 Client Credentials flow, use the instance-specific URL
+    // According to Salesforce documentation, the token endpoint should use the specific instance URL
+    // Check for manual override first, then use the instance URL from configuration
     let tokenUrl;
     
     // Allow manual override via environment variable
@@ -60,25 +60,19 @@ async function authenticateSalesforce() {
       tokenUrl = process.env.SALESFORCE_TOKEN_ENDPOINT;
       console.log(`Using manual token endpoint override: ${tokenUrl}`);
     } else {
-      // Auto-detect based on login URL
-      // Default to login.salesforce.com (production)
-      // Only use test.salesforce.com for explicit sandbox indicators
-      const loginUrl = SALESFORCE_CONFIG.loginUrl.toLowerCase();
+      // Use the instance-specific URL from SALESFORCE_LOGIN_URL
+      // Construct the token endpoint using the same domain as the login URL
+      // For example: https://your-instance.salesforce.com/services/oauth2/token
+      const loginUrl = SALESFORCE_CONFIG.loginUrl.trim();
       
-      // Check if it's explicitly a sandbox
-      // Only use test.salesforce.com if we're very sure it's a sandbox
-      if (loginUrl.includes('test.salesforce.com') ||
-          (loginUrl.includes('--') && loginUrl.includes('.sandbox.'))) {
-        // Explicit sandbox - use test.salesforce.com
-        tokenUrl = 'https://test.salesforce.com/services/oauth2/token';
-        console.log('Detected explicit sandbox instance - using test.salesforce.com');
-      } else {
-        // Default to production - use login.salesforce.com
-        tokenUrl = 'https://login.salesforce.com/services/oauth2/token';
-        console.log('Using production login endpoint: login.salesforce.com');
-      }
+      // Remove trailing slash if present
+      const baseUrl = loginUrl.replace(/\/$/, '');
       
-      console.log(`Using token endpoint: ${tokenUrl}`);
+      // Construct token endpoint using the instance URL
+      tokenUrl = `${baseUrl}/services/oauth2/token`;
+      
+      console.log(`Using instance-specific token endpoint: ${tokenUrl}`);
+      console.log(`Based on login URL: ${loginUrl}`);
     }
     
     // Prepare the request body for Client Credentials flow
