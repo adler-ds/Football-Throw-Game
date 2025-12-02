@@ -19,10 +19,14 @@ The error "request not supported on this domain" when using `login.salesforce.co
 ### Step 2: Configure OAuth Scopes
 
 Under **Selected OAuth Scopes**, you need:
+- **Manage user data via APIs (api)** - **REQUIRED for REST API access**
 - **Full access (full)** - OR
 - **Perform requests on your behalf at any time (refresh_token, offline_access)**
 
-**Important:** The Client Credentials flow requires specific scopes. Make sure at least one of these is selected.
+**Important:** 
+- The **"Manage user data via APIs (api)"** scope is **essential** for REST API calls
+- Without this scope, tokens may authenticate but fail with "INVALID_SESSION_ID" for REST API
+- The Client Credentials flow requires specific scopes. Make sure at least one of these is selected.
 
 ### Step 3: Enable Client Credentials Flow
 
@@ -35,6 +39,27 @@ The Connected App must explicitly support Client Credentials flow:
 2. For Client Credentials flow, you typically need:
    - **Permitted Users**: "All users may self-authorize" OR "Admin approved users are pre-authorized"
    - **IP Relaxation**: May need to be relaxed for Heroku IPs
+
+### Step 3.5: Configure Run-As User (CRITICAL for REST API)
+
+**This is the most important step for REST API access!**
+
+For Client Credentials flow tokens to work with REST API, you MUST configure a "Run-As User":
+
+1. In the Connected App settings, find **OAuth Policies** section
+2. Set **Permitted Users** to: **"Admin approved users are pre-authorized"**
+3. **Click Save** - This will reveal the **Run-As User** field
+4. Select a **Run-As User** from the dropdown
+   - This user must have:
+     - ✅ **API Enabled** permission in their profile
+     - ✅ Permissions to access the objects/APIs you need
+     - ✅ Appropriate security settings (not locked to IP, etc.)
+5. **Save** the Connected App
+
+**Why this is critical:**
+- Without a Run-As User, Client Credentials tokens may authenticate but fail with "INVALID_SESSION_ID" for REST API calls
+- The Run-As User provides the security context for all API calls made with this token
+- The token will inherit the permissions of the Run-As User
 
 ### Step 4: Verify Consumer Key and Secret
 
