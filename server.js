@@ -468,10 +468,14 @@ app.post('/api/salesforce/create-member', async (req, res) => {
 
     // Make REST API call to Salesforce Flow using jsforce request method
     // The request method automatically handles authentication headers
+    // Note: body must be a JSON string, not an object (to avoid chunk error)
     const result = await connection.request({
       method: 'POST',
       url: flowApiPath,
-      body: flowRequestBody
+      body: JSON.stringify(flowRequestBody),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
 
     console.log('Flow API Response:', JSON.stringify(result, null, 2));
