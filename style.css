@@ -9,7 +9,7 @@ body {
     padding: 0;
     font-family: Arial, sans-serif;
     background: #2c3e50;
-    min-height: 100vh;
+    height: 100vh;
     overflow: hidden;
     display: flex;
     justify-content: center;
@@ -18,14 +18,16 @@ body {
 
 #gameContainer {
     position: relative;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 70%, #228B22 100%);
     overflow: hidden;
 }
 
 #gameCanvas {
     display: block;
+    width: 100%;
+    height: 100%;
 }
 
 #powerMeter {
@@ -184,34 +186,27 @@ body {
 
 /* Desktop: constrain to mobile-like dimensions */
 @media (min-width: 769px) {
+    body {
+        padding: 20px;
+    }
+    
     #gameContainer {
-        max-width: 428px;  /* iPhone 14 Pro Max width */
-        max-height: 926px; /* iPhone 14 Pro Max height */
-        width: 100%;
-        height: 100%;
+        width: 428px !important;   /* iPhone 14 Pro Max width */
+        height: 926px !important;  /* iPhone 14 Pro Max height */
+        max-width: 90vw;
+        max-height: 90vh;
         margin: 0 auto;
         border-radius: 20px;
         box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
         overflow: hidden;
-    }
-    
-    /* Ensure canvas fits within container */
-    #gameCanvas {
-        max-width: 428px;
-        max-height: 926px;
     }
 }
 
 /* Tablet and smaller desktop */
 @media (min-width: 769px) and (max-width: 1024px) {
     #gameContainer {
-        max-width: 375px;  /* iPhone SE/11 Pro width */
-        max-height: 812px; /* iPhone SE/11 Pro height */
-    }
-    
-    #gameCanvas {
-        max-width: 375px;
-        max-height: 812px;
+        width: 375px !important;  /* iPhone SE/11 Pro width */
+        height: 812px !important; /* iPhone SE/11 Pro height */
     }
 }
 
@@ -219,9 +214,12 @@ body {
 @media (max-width: 768px) {
     body {
         background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 70%, #228B22 100%);
+        padding: 0;
     }
     
     #gameContainer {
+        width: 100vw !important;
+        height: 100vh !important;
         border-radius: 0;
         box-shadow: none;
     }
