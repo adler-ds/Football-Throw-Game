@@ -4,25 +4,9 @@ const ctx = canvas.getContext('2d');
 const powerBar = document.getElementById('powerBar');
 
 // Set canvas size to match container dimensions
-function resizeCanvas() {
-    const container = document.getElementById('gameContainer');
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
-    
-    // Update target position when canvas resizes
-    if (typeof TARGET !== 'undefined') {
-        TARGET.x = canvas.width * 0.8;
-        TARGET.y = canvas.height * 0.3;
-    }
-}
-
-// Initial canvas setup
-resizeCanvas();
-
-// Handle window resize
-window.addEventListener('resize', () => {
-    resizeCanvas();
-});
+const container = document.getElementById('gameContainer');
+canvas.width = container.clientWidth;
+canvas.height = container.clientHeight;
 
 // Game state
 let gameState = {
