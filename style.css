@@ -8,15 +8,20 @@ body {
     margin: 0;
     padding: 0;
     font-family: Arial, sans-serif;
-    background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 70%, #228B22 100%);
-    height: 100vh;
+    background: #2c3e50;
+    min-height: 100vh;
     overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 #gameContainer {
     position: relative;
     width: 100vw;
     height: 100vh;
+    background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 70%, #228B22 100%);
+    overflow: hidden;
 }
 
 #gameCanvas {
@@ -177,7 +182,50 @@ body {
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 }
 
+/* Desktop: constrain to mobile-like dimensions */
+@media (min-width: 769px) {
+    #gameContainer {
+        max-width: 428px;  /* iPhone 14 Pro Max width */
+        max-height: 926px; /* iPhone 14 Pro Max height */
+        width: 100%;
+        height: 100%;
+        margin: 0 auto;
+        border-radius: 20px;
+        box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+    }
+    
+    /* Ensure canvas fits within container */
+    #gameCanvas {
+        max-width: 428px;
+        max-height: 926px;
+    }
+}
+
+/* Tablet and smaller desktop */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #gameContainer {
+        max-width: 375px;  /* iPhone SE/11 Pro width */
+        max-height: 812px; /* iPhone SE/11 Pro height */
+    }
+    
+    #gameCanvas {
+        max-width: 375px;
+        max-height: 812px;
+    }
+}
+
+/* Mobile: full screen */
 @media (max-width: 768px) {
+    body {
+        background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 70%, #228B22 100%);
+    }
+    
+    #gameContainer {
+        border-radius: 0;
+        box-shadow: none;
+    }
+    
     #powerMeter {
         left: 20px;
         width: 25px;
@@ -211,4 +259,17 @@ body {
         padding: 30px 20px;
         min-width: 280px;
     }
+}
+
+/* Touch-friendly buttons for all devices */
+#throwButton {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+#playAgainBtn {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: manipulation;
 }
