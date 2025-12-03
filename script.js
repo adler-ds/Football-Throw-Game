@@ -393,9 +393,11 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// Handle window resize
 window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const container = document.getElementById('gameContainer');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
     TARGET.x = canvas.width * 0.8;
     TARGET.y = canvas.height * 0.3;
 });
