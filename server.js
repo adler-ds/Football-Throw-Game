@@ -13,8 +13,11 @@ app.use(require('cors')());
 // Salesforce Configuration - Using Connected App credentials
 const SALESFORCE_CONFIG = {
   // Token Endpoint for OAuth 2.0 Client Credentials flow
-  // Try instance URL first if provided, otherwise use standard login domain
-  tokenEndpoint: process.env.SALESFORCE_TOKEN_ENDPOINT || 'https://login.salesforce.com/services/oauth2/token',
+  // For My Domain orgs, use instance URL; otherwise use standard login domain
+  // Priority: 1) SALESFORCE_TOKEN_ENDPOINT env var, 2) Construct from SALESFORCE_INSTANCE_URL, 3) Default to login.salesforce.com
+  tokenEndpoint: process.env.SALESFORCE_TOKEN_ENDPOINT || 
+                 (process.env.SALESFORCE_INSTANCE_URL ? `${process.env.SALESFORCE_INSTANCE_URL.replace(/\/$/, '')}/services/oauth2/token` : null) ||
+                 'https://login.salesforce.com/services/oauth2/token',
   // Consumer Key and Secret from Connected App
   // Supports both naming conventions for flexibility
   consumerKey: process.env.SALESFORCE_CONSUMER_KEY || process.env.SALESFORCE_CLIENT_ID,
