@@ -291,6 +291,14 @@
                     // Store MemberID
                     playerData.memberId = data.memberId;
                     
+                    // Store gameParticipantRewardId if available
+                    if (data.gameParticipantRewardId) {
+                        playerData.gameParticipantRewardId = data.gameParticipantRewardId;
+                        console.log('Game Participant Reward ID stored:', data.gameParticipantRewardId);
+                    } else if (data.warning) {
+                        console.warn('Warning:', data.warning);
+                    }
+                    
                     // Store in sessionStorage for use in game
                     sessionStorage.setItem('playerData', JSON.stringify(playerData));
                     

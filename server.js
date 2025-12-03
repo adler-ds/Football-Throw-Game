@@ -573,11 +573,51 @@ app.post('/api/salesforce/create-member', async (req, res) => {
         const memberId = flowResult.outputValues.MemberID;
         console.log(`✅ Member created successfully with MemberID: ${memberId}`);
         
-        return res.json({
-          success: true,
-          memberId: memberId,
-          message: 'Member created successfully'
-        });
+        // Now fetch the game participant reward ID for FootballThrowGame
+        try {
+          const gamesApiPath = `/services/data/v65.0/game/participant/${memberId}/games`;
+          console.log(`Fetching games for participant: ${memberId}`);
+          
+          const gamesResponse = await salesforceApiCall('GET', gamesApiPath);
+          console.log('Games API Response:', JSON.stringify(gamesResponse, null, 2));
+          
+          // Find FootballThrowGame and extract gameParticipantRewardId
+          let gameParticipantRewardId = null;
+          if (gamesResponse.gameDefinitions && Array.isArray(gamesResponse.gameDefinitions)) {
+            const footballGame = gamesResponse.gameDefinitions.find(
+              game => game.name === 'FootballThrowGame'
+            );
+            
+            if (footballGame && footballGame.participantGameRewards && 
+                Array.isArray(footballGame.participantGameRewards) && 
+                footballGame.participantGameRewards.length > 0) {
+              // Get the first participantGameReward (or you could filter by status if needed)
+              gameParticipantRewardId = footballGame.participantGameRewards[0].gameParticipantRewardId;
+              console.log(`✅ Found gameParticipantRewardId for FootballThrowGame: ${gameParticipantRewardId}`);
+            } else {
+              console.warn('⚠️  FootballThrowGame found but no participantGameRewards');
+            }
+          } else {
+            console.warn('⚠️  No gameDefinitions found in games API response');
+          }
+          
+          return res.json({
+            success: true,
+            memberId: memberId,
+            gameParticipantRewardId: gameParticipantRewardId,
+            message: 'Member created successfully' + (gameParticipantRewardId ? ' and game participant reward retrieved' : '')
+          });
+        } catch (gamesError) {
+          console.error('Error fetching games for participant:', gamesError);
+          // Still return success with memberId even if games API fails
+          return res.json({
+            success: true,
+            memberId: memberId,
+            gameParticipantRewardId: null,
+            message: 'Member created successfully, but failed to retrieve game participant reward',
+            warning: gamesError.message
+          });
+        }
       } else {
         // Flow completed but may have errors
         const errors = flowResult.errors || ['Unknown error occurred'];
