@@ -661,6 +661,52 @@ app.post('/api/salesforce/create-member', async (req, res) => {
 });
 
 // Route for registration page
+// Get game reward details
+app.get('/api/salesforce/game-reward/:gameParticipantRewardId', async (req, res) => {
+  try {
+    const { gameParticipantRewardId } = req.params;
+    
+    if (!gameParticipantRewardId) {
+      return res.status(400).json({
+        success: false,
+        error: 'gameParticipantRewardId is required'
+      });
+    }
+    
+    console.log(`Fetching game reward for participant reward: ${gameParticipantRewardId}`);
+    
+    // Call Salesforce API to get game reward details
+    const apiPath = `/services/data/v65.0/game/gameparticipantreward/${gameParticipantRewardId}/game-reward`;
+    const result = await salesforceApiCall('GET', apiPath);
+    
+    console.log('Game reward API response:', JSON.stringify(result, null, 2));
+    
+    // Extract reward name from response
+    // Response structure: { gameReward: [{name: "...", ...}], status: true }
+    let rewardName = 'a Prize'; // Default
+    
+    if (result && result.gameReward && Array.isArray(result.gameReward) && result.gameReward.length > 0) {
+      rewardName = result.gameReward[0].name;
+    }
+    
+    console.log(`✅ Game reward name: ${rewardName}`);
+    
+    return res.json({
+      success: true,
+      rewardName: rewardName,
+      fullResponse: result
+    });
+    
+  } catch (error) {
+    console.error('Error fetching game reward:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      rewardName: 'a Prize' // Fallback
+    });
+  }
+});
+
 app.get('/register', (req, res) => {
     res.sendFile(path.join(__dirname, 'register.html'));
 });

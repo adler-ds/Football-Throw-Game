@@ -17,7 +17,8 @@ let gameState = {
     throws: 0,
     timeLeft: 10,
     gameActive: false,
-    prize: "Free Appetizer!" // Prize variable
+    prize: null, // Will be fetched from API
+    prizeLoading: true // Track if prize is being fetched
 };
 
 // Target configuration
@@ -304,9 +305,45 @@ function throwFootball() {
 }
 
 // Start game
+// Fetch game reward from API
+async function fetchGameReward() {
+    try {
+        const playerData = JSON.parse(sessionStorage.getItem('playerData'));
+        
+        if (!playerData || !playerData.gameParticipantRewardId) {
+            console.warn('No gameParticipantRewardId found, using default prize');
+            gameState.prize = 'a Prize';
+            gameState.prizeLoading = false;
+            return;
+        }
+        
+        const gameParticipantRewardId = playerData.gameParticipantRewardId;
+        console.log('Fetching game reward for:', gameParticipantRewardId);
+        
+        const response = await fetch(`/api/salesforce/game-reward/${gameParticipantRewardId}`);
+        const data = await response.json();
+        
+        if (data.success && data.rewardName) {
+            gameState.prize = data.rewardName;
+            console.log('Game reward fetched:', gameState.prize);
+        } else {
+            console.warn('Failed to fetch reward, using default');
+            gameState.prize = 'a Prize';
+        }
+    } catch (error) {
+        console.error('Error fetching game reward:', error);
+        gameState.prize = 'a Prize';
+    } finally {
+        gameState.prizeLoading = false;
+    }
+}
+
 function startGame() {
     gameState.gameActive = true;
     gameState.timeLeft = 10;
+    
+    // Fetch the game reward in the background
+    fetchGameReward();
 
     const timer = setInterval(() => {
         gameState.timeLeft--;
